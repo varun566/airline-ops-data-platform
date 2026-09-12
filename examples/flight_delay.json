@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "run_id": "f0000000-0000-4000-8000-000000000001",
+  "event_id": "571b5f45-57c2-47a4-9e6a-a2c5ae5c6a19",
+  "event_type": "flight_delay",
+  "flight_id": "AO100-2026-09-12-f0000000-0000-4000-8000-000000000001",
+  "flight_number": "AO100",
+  "timestamp": "2026-09-12T11:40:00+00:00",
+  "origin": "JFK",
+  "dest": "LAX",
+  "scheduled_dep": "2026-09-12T12:00:00+00:00",
+  "actual_dep": null,
+  "delay_min": 10,
+  "reason": "weather",
+  "gate": null,
+  "pax_id": null
+}

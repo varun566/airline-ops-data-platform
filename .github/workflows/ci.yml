@@ -1,0 +1,48 @@
+name: Pipeline CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose and build
+        run: |
+          docker compose config --quiet
+          docker compose build bootstrap
+      - name: Lint
+        run: docker compose run --rm --no-deps tests ruff check .
+      - name: Unit tests with real local Spark
+        run: docker compose run --rm --no-deps tests pytest -q tests/unit
+      - name: Start the complete platform
+        run: docker compose up -d
+      - name: Wait for demo and end-to-end tests
+        run: |
+          code=$(docker wait "$(docker compose ps -aq demo)")
+          docker compose logs --no-color demo
+          test "$code" = 0
+      - name: Collect service logs and quality report
+        if: always()
+        run: |
+          mkdir -p artifacts
+          docker compose logs --no-color > artifacts/compose.log 2>&1
+          docker compose ps -a > artifacts/services.txt
+          docker compose exec -T postgres psql -U airline -d airline -c \
+            'COPY (SELECT * FROM data_quality_report ORDER BY report_id) TO STDOUT WITH CSV HEADER' \
+            > artifacts/data_quality_report.csv || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pipeline-verification
+          path: artifacts/
+      - name: Stop CI services
+        if: always()
+        run: docker compose down -v

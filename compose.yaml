@@ -1,0 +1,160 @@
+name: airline-ops
+
+x-app: &app
+  image: airline-ops-app:local
+  build: .
+  init: true
+  environment: &app-env
+    KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    KAFKA_TOPIC: airline-events
+    KAFKA_GROUP_ID: airline-raw-writer
+    S3_ENDPOINT: http://minio:9000
+    S3_ACCESS_KEY: ${MINIO_ROOT_USER:-airline}
+    S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-airline-local-only}
+    S3_BUCKET: airline-raw
+    PGHOST: postgres
+    PGPORT: "5432"
+    PGDATABASE: airline
+    PGUSER: airline
+    PGPASSWORD: ${POSTGRES_PASSWORD:-airline-local-only}
+    SPARK_MASTER: local[2]
+    SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-1g}
+  networks: [airline]
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.9.9
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      KAFKA_HEAP_OPTS: -Xms128m -Xmx256m
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
+    healthcheck:
+      test: [CMD-SHELL, "cub zk-ready localhost:2181 5"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+    restart: unless-stopped
+    networks: [airline]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.9.9
+    depends_on:
+      zookeeper: {condition: service_healthy}
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:${KAFKA_PORT:-9092}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    ports: ["127.0.0.1:${KAFKA_PORT:-9092}:9092"]
+    volumes: ["kafka-data:/var/lib/kafka/data"]
+    healthcheck:
+      test: [CMD-SHELL, "kafka-topics --bootstrap-server localhost:29092 --list >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    networks: [airline]
+
+  postgres:
+    image: postgres:17.6-bookworm
+    environment:
+      POSTGRES_DB: airline
+      POSTGRES_USER: airline
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-airline-local-only}
+      TZ: UTC
+    ports: ["127.0.0.1:${POSTGRES_PORT:-5433}:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./sql/001_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U airline -d airline"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [airline]
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ':9001'
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-airline}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-airline-local-only}
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes: ["minio-data:/data"]
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:9000/minio/health/live]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks: [airline]
+
+  bootstrap:
+    <<: *app
+    command: python -m airline_ops.bootstrap
+    depends_on:
+      kafka: {condition: service_healthy}
+      postgres: {condition: service_healthy}
+      minio: {condition: service_healthy}
+
+  consumer:
+    <<: *app
+    command: python -m airline_ops.consumer
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  demo:
+    <<: *app
+    command: python -m airline_ops.demo
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+      consumer: {condition: service_started}
+    mem_limit: 3g
+
+  producer:
+    <<: *app
+    profiles: [tools]
+    command: python -m airline_ops.producer --continuous --interval 1
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+
+  transform:
+    <<: *app
+    profiles: [tools]
+    command: python -m airline_ops.transform
+    mem_limit: 3g
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+
+  tests:
+    <<: *app
+    profiles: [tools]
+    command: pytest -q tests/unit
+    mem_limit: 3g
+
+networks:
+  airline:
+volumes:
+  zookeeper-data:
+  zookeeper-log:
+  kafka-data:
+  postgres-data:
+  minio-data:
