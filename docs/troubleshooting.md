@@ -158,3 +158,20 @@ hook emits a warning, and CI retains the service logs.
   consumer; inspect the unhealthy service's own logs before changing retries.
 - `docker compose down` preserves data. `docker compose down -v` irreversibly
   removes this project's named volumes; use only for an intentional demo reset.
+
+
+## Dashboard shows a recorded snapshot locally
+
+The live API could not be reached. Check `docker compose ps api frontend` and
+`docker compose logs --tail=80 api frontend`. Open http://localhost:8088 using the
+configured dashboard port. `curl -f http://localhost:8088/api/dashboard` should
+return `"mode": "live"`. The dashboard retries every 12 seconds. The hosted public
+site always uses the recorded snapshot by design.
+
+## Simulation button fails or stays busy
+
+Read `docker compose exec api cat /tmp/airline-dashboard-demo.log`. Each click runs
+the fixed demo, including Spark and integration tests, with a ten-minute timeout.
+Check Kafka, MinIO, and PostgreSQL health before retrying. A 409 means another
+simulation started through this API is still running. Avoid starting additional
+CLI demos during an interview to keep resource usage predictable.

@@ -17,7 +17,7 @@ jobs:
       - name: Validate Compose and build
         run: |
           docker compose config --quiet
-          docker compose build bootstrap
+          docker compose build bootstrap frontend
       - name: Lint
         run: docker compose run --rm --no-deps tests ruff check .
       - name: Unit tests with real local Spark
@@ -29,6 +29,22 @@ jobs:
           code=$(docker wait "$(docker compose ps -aq demo)")
           docker compose logs --no-color demo
           test "$code" = 0
+      - name: Verify dashboard and live API
+        run: |
+          curl --retry 12 --retry-connrefused --retry-delay 5 -fsS http://localhost:8088/ > /tmp/dashboard.html
+          curl -fsS http://localhost:8088/api/dashboard > /tmp/dashboard.json
+          python3 - <<'PYTHON'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('/tmp/dashboard.json').read_text())
+          assert data['mode'] == 'live'
+          run = data['runs'][0]
+          assert run['raw_count'] == 32
+          assert len([f for f in data['flights'] if f['source_run_id'] == run['run_id']]) == 4
+          checks = [c for c in data['checks'] if c['run_id'] == run['run_id']]
+          assert len(checks) == 11 and all(c['passed'] for c in checks)
+          assert 'AeroStream' in Path('/tmp/dashboard.html').read_text()
+          PYTHON
       - name: Collect service logs and quality report
         if: always()
         run: |

@@ -6,3 +6,4 @@
 .ruff_cache
 artifacts
 *.egg-info
+frontend

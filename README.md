@@ -9,7 +9,7 @@ demo includes intentional duplicate events, shuffled arrival order, and real
 end-to-end PyTest assertions recorded in the database.
 
 **Stack:** Python 3.11 · Kafka + ZooKeeper (Confluent 7.9.9) · MinIO · PySpark 3.5.7 ·
-PostgreSQL 17 · Docker Compose · PyTest
+PostgreSQL 17 · Docker Compose · PyTest · React · TypeScript · Tailwind CSS
 
 ```mermaid
 flowchart LR
@@ -21,6 +21,10 @@ flowchart LR
     M -->|S3A batch read| S[PySpark<br/>Cast · validate · deduplicate]
     S -->|JDBC staging + atomic merge| DB[(PostgreSQL<br/>flights · delays · passengers)]
     S --> Q[(rejected_events)]
+    DB --> API[Python dashboard API]
+    M --> API
+    API --> UI[React operations dashboard]
+    UI -.->|Run simulation · local only| P
     T[PyTest] -.->|Delivery · counts · FKs · replay| K
     T -.-> DB
     T --> R[(data_quality_report)]
@@ -50,7 +54,7 @@ docker compose ps -a
 
 A successful `demo` container exits with code `0` and prints `Demo passed`.
 `bootstrap` also exits successfully; the broker, database, object store, and
-consumer keep running. A failed assertion makes the demo exit nonzero.
+consumer, dashboard API, and frontend keep running. A failed assertion makes the demo exit nonzero.
 
 | Result from each default demo | Expected |
 | --- | ---: |
@@ -60,6 +64,32 @@ consumer keep running. A failed assertion makes the demo exit nonzero.
 
 Generate another independent demo with `docker compose run --rm demo`. Existing
 rows remain, and all verification counts are scoped to the new run.
+
+## AeroStream dashboard
+
+**[Open the public recruiter demo](https://aerostream-airline-ops.venkatanagulapalli00.chatgpt.site)** · No setup or sign-in required.
+The hosted demo uses recorded synthetic pipeline results.
+
+Open **[AeroStream locally](http://localhost:8088)** after Compose starts.
+
+- **Overview:** route map, event counts, and a searchable flight board.
+- **Flight operations:** open a flight to inspect its state, event timeline, original JSON, and raw object key.
+- **Pipeline runs:** compare simulations and reconcile raw, unique, duplicate, and rejected counts.
+- **Data quality:** expand actual PyTest results persisted in PostgreSQL.
+- **Architecture:** explore each pipeline stage, the relational model, and a recruiter presentation script.
+
+**Run simulation** starts a real bounded pipeline run and its integration tests.
+The dashboard polls every 12 seconds; selecting **Latest run** follows the new result.
+Only one dashboard-triggered simulation runs at a time.
+
+The public portfolio build serves a **recorded snapshot of synthetic data**.
+It is labeled as a snapshot and has a project walkthrough in place of the local
+simulation action. It does not connect to your laptop or expose PostgreSQL,
+Kafka, MinIO, or local credentials. If the local API is unavailable, the dashboard
+clearly labels its fallback snapshot.
+
+[Recruiter walkthrough and resume bullets](docs/recruiter-demo.md) ·
+[Frontend development and snapshot export](frontend/README.md)
 
 ## Inspect the results
 
