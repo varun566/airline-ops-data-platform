@@ -1,5 +1,9 @@
 # AeroStream frontend
 
+A dark airline operations console with a route network, departure board, flight
+details, batch accounting, and validation results. Presentation notes belong in
+the main repository documentation, outside the application.
+
 A React / TypeScript operations dashboard with a Vinext static export, Tailwind CSS,
 Radix UI components, and Lucide icons. Docker builds and serves it with nginx.
 

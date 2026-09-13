@@ -2,34 +2,27 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import {
-  Activity,
+  ArrowDownToLine,
   ArrowRight,
   ArrowUpRight,
-  BookOpen,
-  Check,
-  CheckCheck,
   ChevronRight,
   Clock3,
-  ExternalLink,
-  GitBranch,
+  Database,
   Layers3,
-  LayoutDashboard,
+  LoaderCircle,
+  Map,
   Plane,
   Radio,
+  RefreshCw,
   Search,
   ShieldCheck,
   Users,
   Workflow,
-  Play,
-  RefreshCw,
-  LoaderCircle,
 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -64,7 +57,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AIRPORTS,
-  SOURCE,
   date,
   shortId,
   time,
@@ -75,26 +67,35 @@ import usMap from "@/lib/us-map.json";
 import {
   RunsView,
   QualityView,
-  ArchitectureView,
   FlightDetails,
 } from "@/components/platform-views";
 
 const sections = [
-  { id: "overview", name: "Overview", icon: LayoutDashboard },
-  { id: "flights", name: "Flight operations", icon: Plane },
-  { id: "runs", name: "Pipeline runs", icon: Workflow },
-  { id: "quality", name: "Data quality", icon: ShieldCheck },
-  { id: "architecture", name: "Architecture", icon: Layers3 },
+  { id: "overview", name: "Network", icon: Map },
+  { id: "flights", name: "Flights", icon: Plane },
+  { id: "runs", name: "Pipeline", icon: Workflow },
+  { id: "quality", name: "Quality", icon: ShieldCheck },
+];
+const titles: Record<string, string> = {
+  overview: "Network operations",
+  flights: "Flight board",
+  runs: "Pipeline activity",
+  quality: "Data quality",
+};
+const eventTypes = [
+  ["passenger_checkin", "Check-ins"],
+  ["flight_delay", "Delays"],
+  ["flight_scheduled", "Scheduled"],
+  ["gate_change", "Gate changes"],
+  ["flight_departed", "Departures"],
 ];
 
 function Navigation({
   section,
   onSelect,
-  checks,
 }: {
   section: string;
   onSelect: (section: string) => void;
-  checks: number;
 }) {
   const { setOpenMobile } = useSidebar();
   return (
@@ -109,11 +110,8 @@ function Navigation({
               setOpenMobile(false);
             }}
           >
-            <item.icon size={18} />
+            <item.icon />
             <span>{item.name}</span>
-            {item.id === "quality" && checks > 0 && (
-              <span className="nav-count">{checks}</span>
-            )}
           </SidebarMenuButton>
         </SidebarMenuItem>
       ))}
@@ -134,68 +132,84 @@ function RouteMap({
   };
   const airports = [...new Set(flights.flatMap((f) => [f.origin, f.dest]))];
   return (
-    <section className="route-panel">
+    <section className="network-map panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow light">THE NETWORK</span>
-          <h2>Every route. One view.</h2>
+          <span className="eyebrow">ROUTE NETWORK</span>
+          <h2>United States</h2>
         </div>
-        <span className="map-tag">US domestic</span>
+        <span className="map-region">
+          <span className="crosshair" />
+          Domestic operations
+        </span>
       </div>
       <svg
         viewBox="0 0 650 320"
-        role="img"
-        aria-label="Map of the United States showing simulated airline routes"
+        aria-label="US route network"
         className="route-map"
       >
         <defs>
           <pattern
             id="grid"
-            width="25"
-            height="25"
+            width="26"
+            height="26"
             patternUnits="userSpaceOnUse"
           >
-            <circle cx="1" cy="1" r=".7" fill="#52717d" opacity=".35" />
+            <path
+              d="M26 0H0V26"
+              fill="none"
+              stroke="#20313d"
+              strokeWidth=".6"
+            />
           </pattern>
-          <linearGradient id="routeGradient">
-            <stop stopColor="#55d6c2" />
-            <stop offset="1" stopColor="#b1f1cf" />
-          </linearGradient>
+          <radialGradient id="mapglow">
+            <stop stopColor="#263747" stopOpacity=".8" />
+            <stop offset="1" stopColor="#131d28" stopOpacity="0" />
+          </radialGradient>
         </defs>
         <rect width="650" height="320" fill="url(#grid)" />
-        {usMap.map((path, i) => (
-          <path
-            key={i}
-            d={path}
-            fill="#18313b"
-            stroke="#35535e"
-            strokeWidth="1"
-          />
+        <ellipse cx="325" cy="145" rx="325" ry="180" fill="url(#mapglow)" />
+        {usMap.map((d, i) => (
+          <path key={i} d={d} fill="#1b2834" stroke="#3b4b59" strokeWidth="1" />
         ))}
         {flights.map((f, i) => {
           const [x1, y1] = point(f.origin),
             [x2, y2] = point(f.dest);
-          const midX = (x1 + x2) / 2,
-            midY = Math.min(y1, y2) - 40;
+          const mx = (x1 + x2) / 2,
+            my = Math.min(y1, y2) - 32;
+          const path = `M${x1},${y1} Q${mx},${my} ${x2},${y2}`;
           return (
             <g
               key={f.flight_id}
               className="map-route"
+              role="button"
+              tabIndex={0}
+              aria-label={`Open route ${f.flight_number}, ${f.origin} to ${f.dest}`}
               onClick={() => onSelect(f)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(f);
+                }
+              }}
             >
               <path
-                d={`M${x1},${y1} Q${midX},${midY} ${x2},${y2}`}
+                d={path}
                 fill="none"
-                stroke="url(#routeGradient)"
-                strokeWidth="1.6"
-                opacity=".85"
-                strokeDasharray={i === 0 ? "0" : "4 4"}
+                stroke="transparent"
+                strokeWidth="16"
+              />
+              <path
+                d={path}
+                fill="none"
+                stroke={i % 2 ? "#86a9c9" : "#f6ae57"}
+                strokeWidth="1.7"
               />
               <circle
-                cx={(x1 + 2 * midX + x2) / 4}
-                cy={(y1 + 2 * midY + y2) / 4}
+                cx={(x1 + 2 * mx + x2) / 4}
+                cy={(y1 + 2 * my + y2) / 4}
                 r="3"
-                fill="#9bf0d7"
+                fill={i % 2 ? "#abc5dc" : "#f6ae57"}
               />
             </g>
           );
@@ -204,13 +218,13 @@ function RouteMap({
           const [x, y] = point(code);
           return (
             <g key={code}>
-              <circle cx={x} cy={y} r="7" fill="#65d7ba" opacity=".12" />
-              <circle cx={x} cy={y} r="3" fill="#9bf0d7" />
+              <circle cx={x} cy={y} r="7" fill="#f6ae57" opacity=".14" />
+              <circle cx={x} cy={y} r="2.5" fill="#f7c484" />
               <text
-                x={x + 10}
+                x={x + 9}
                 y={y + (code === "BOS" ? -6 : 5)}
-                fill="#dce9e9"
-                fontSize="16"
+                fill="#d8e0e8"
+                fontSize="12"
                 fontWeight="600"
               >
                 {code}
@@ -218,27 +232,27 @@ function RouteMap({
             </g>
           );
         })}
-        <text x="105" y="275" fontSize="12" letterSpacing="3" fill="#607b85">
+        <text x="65" y="257" fill="#687c8e" fontSize="12" letterSpacing="2">
           PACIFIC OCEAN
         </text>
         <text
-          x="513"
-          y="204"
+          x="502"
+          y="218"
+          fill="#687c8e"
           fontSize="12"
-          letterSpacing="3"
-          fill="#607b85"
-          transform="rotate(62 513 204)"
+          letterSpacing="2"
+          transform="rotate(65 502 218)"
         >
           ATLANTIC OCEAN
         </text>
       </svg>
       <div className="map-footer">
         <span>
-          <i className="dot mint" />
-          {flights.length} flight routes
+          <i className="route-key" />
+          {flights.length} routes
         </span>
-        <span>{airports.length} airports connected</span>
-        <span className="map-coordinates">24°N — 49°N</span>
+        <span>{airports.length} airports</span>
+        <span className="map-footer-end">Route view · UTC</span>
       </div>
     </section>
   );
@@ -247,18 +261,19 @@ function RouteMap({
 function FlightTable({
   flights,
   onSelect,
+  compact = false,
 }: {
   flights: Flight[];
   onSelect: (flight: Flight) => void;
+  compact?: boolean;
 }) {
   return (
-    <Table className="flight-table">
+    <Table className={`flight-table ${compact ? "compact-table" : ""}`}>
       <TableHeader>
         <TableRow>
-          <TableHead>Flight</TableHead>
-          <TableHead>Route</TableHead>
-          <TableHead>Departure · UTC</TableHead>
-          <TableHead>Gate</TableHead>
+          <TableHead>Flight / Route</TableHead>
+          <TableHead>Departure</TableHead>
+          {!compact && <TableHead>Gate</TableHead>}
           <TableHead>Delay</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>
@@ -271,39 +286,37 @@ function FlightTable({
           <TableRow key={f.flight_id}>
             <TableCell>
               <button className="flight-number" onClick={() => onSelect(f)}>
-                <span className="airline-mark">
-                  <Plane size={15} />
-                </span>
                 {f.flight_number}
               </button>
-            </TableCell>
-            <TableCell>
-              <span className="route-codes">
+              <small className="route-codes">
                 {f.origin}
-                <ArrowRight size={13} />
+                <ArrowRight size={11} />
                 {f.dest}
-              </span>
-              <small>
-                {AIRPORTS[f.origin]?.city} to {AIRPORTS[f.dest]?.city}
               </small>
             </TableCell>
             <TableCell>
               <strong className="tabular">
                 {time(f.actual_dep || f.scheduled_dep)}
               </strong>
-              <small>Scheduled {time(f.scheduled_dep)}</small>
+              <small>
+                {compact
+                  ? `Gate ${f.gate || "—"}`
+                  : `Scheduled ${time(f.scheduled_dep)}`}
+              </small>
             </TableCell>
+            {!compact && (
+              <TableCell>
+                <span className="gate">{f.gate || "—"}</span>
+              </TableCell>
+            )}
             <TableCell>
-              <span className="gate">{f.gate || "—"}</span>
-            </TableCell>
-            <TableCell>
-              <span className="delay-value">+{f.delay_min || 0} min</span>
-            </TableCell>
-            <TableCell>
-              <span className={`status ${f.status}`}>
-                <Check size={12} />
-                {f.status}
+              <span className="delay-value">
+                +{f.delay_min || 0}
+                <small className="inline-unit"> min</small>
               </span>
+            </TableCell>
+            <TableCell>
+              <span className={`status ${f.status}`}>{f.status}</span>
             </TableCell>
             <TableCell>
               <button
@@ -311,7 +324,7 @@ function FlightTable({
                 aria-label={`View ${f.flight_number} details`}
                 onClick={() => onSelect(f)}
               >
-                <ChevronRight size={17} />
+                <ArrowUpRight size={15} />
               </button>
             </TableCell>
           </TableRow>
@@ -341,22 +354,21 @@ export default function Home() {
           const response = await fetch("/api/dashboard", {
             signal: AbortSignal.timeout(15000),
           });
-          if (!response.ok) throw new Error("Local API unavailable");
+          if (!response.ok) throw new Error("API unavailable");
           const live = (await response.json()) as Platform;
-          if (live.mode !== "live") throw new Error("Invalid API response");
+          if (live.mode !== "live") throw new Error("Invalid response");
           setData(live);
           setConnectionNote("");
           setError("");
           return;
         } catch {
           setConnectionNote(
-            "Live connection unavailable. Showing a recorded demo snapshot.",
+            "Live connection unavailable. Displaying the last recorded dataset.",
           );
         }
       }
       const response = await fetch("/demo-data.json");
-      if (!response.ok)
-        throw new Error("Unable to load the demonstration data.");
+      if (!response.ok) throw new Error("Unable to load operations data.");
       setData(await response.json());
       setError("");
     } catch (e) {
@@ -375,7 +387,6 @@ export default function Home() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0 });
   }, [section]);
-
   async function runSimulation() {
     setSimulationStarting(true);
     setActionError("");
@@ -412,94 +423,61 @@ export default function Home() {
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
-  const eventTypes = [
-    ["passenger_checkin", "Passenger check-in"],
-    ["flight_delay", "Flight delay"],
-    ["flight_scheduled", "Flight scheduled"],
-    ["gate_change", "Gate change"],
-    ["flight_departed", "Departure"],
-  ];
+  const averageDelay = flights.length
+    ? flights.reduce((n, f) => n + (f.delay_min || 0), 0) / flights.length
+    : 0;
+  const passengerCount = flights.reduce((n, f) => n + f.passengers, 0);
+  const departed = flights.filter((f) => f.status === "departed").length;
   return (
-    <SidebarProvider style={{ "--sidebar-width": "235px" } as CSSProperties}>
+    <SidebarProvider style={{ "--sidebar-width": "88px" } as CSSProperties}>
       <Sidebar className="app-sidebar">
         <SidebarHeader>
-          <a className="brand" href="#" onClick={() => setSection("overview")}>
-            <span className="brand-icon">
-              <Plane size={23} />
-            </span>
-            <span>
-              AeroStream<small>AIRLINE OPS</small>
-            </span>
-          </a>
+          <button
+            className="brand-mark"
+            aria-label="AeroStream network"
+            onClick={() => setSection("overview")}
+          >
+            <Plane size={27} />
+          </button>
         </SidebarHeader>
         <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>WORKSPACE</SidebarGroupLabel>
-            <Navigation
-              section={section}
-              onSelect={setSection}
-              checks={checks.length}
-            />
-          </SidebarGroup>
-          <div className="sidebar-story">
-            <span className="little-icon">
-              <GitBranch size={17} />
-            </span>
-            <h3>Built for reliability.</h3>
-            <p>Follow an event from the runway to a trusted database record.</p>
-            <button onClick={() => setSection("architecture")}>
-              Explore the pipeline <ArrowUpRight size={15} />
-            </button>
-          </div>
+          <Navigation section={section} onSelect={setSection} />
         </SidebarContent>
         <SidebarFooter>
-          <a
-            className="source-link"
-            href={SOURCE}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <GitBranch size={17} />
-            View project source
-            <ExternalLink size={13} />
-          </a>
-          <div className="profile">
-            <span className="avatar">V</span>
-            <div>
-              <strong>Varun</strong>
-              <small>Data engineering portfolio</small>
-            </div>
+          <div className="rail-footer">
+            <Radio size={19} />
+            <span>UTC</span>
           </div>
         </SidebarFooter>
       </Sidebar>
       <div className="workspace">
         <header className="topbar">
-          <div className="breadcrumb">
+          <div className="brand-lockup">
             <SidebarTrigger className="mobile-trigger" />
-            <span>Workspace</span>
-            <ChevronRight size={13} />
-            <strong>{sections.find((s) => s.id === section)?.name}</strong>
+            <strong>
+              AEROSTREAM<span className="brand-period">.</span>
+            </strong>
+            <span className="brand-divider" />
+            <span>OPERATIONS CONTROL</span>
           </div>
           <div className="topbar-right">
-            <span className="environment">
-              <i className="dot" />{" "}
-              {data?.mode === "live" ? "Local platform" : "Portfolio demo"}
+            <span className="data-mode">
+              <i />
+              {data?.mode === "live" ? "Local connection" : "Simulated dataset"}
             </span>
-            <span className="topbar-divider" />
             <span className="topbar-date">{date(run?.created_at)}</span>
-            <span className="avatar small">V</span>
           </div>
         </header>
         <main className="main-content">
           <div className="page-heading">
-            <div>
-              <span className="eyebrow">OPERATIONS INTELLIGENCE</span>
-              <h1>
-                {section === "overview"
-                  ? "Operations overview"
-                  : sections.find((s) => s.id === section)?.name}
-              </h1>
-              <p>Your airline data, from first event to final insight.</p>
+            <div className="title-block">
+              <span className="section-index">
+                {String(
+                  sections.findIndex((s) => s.id === section) + 1,
+                ).padStart(2, "0")}{" "}
+                / OPERATIONS
+              </span>
+              <h1>{titles[section]}</h1>
             </div>
             <div className="heading-actions">
               <Select value={selectedRun} onValueChange={setSelectedRun}>
@@ -507,8 +485,8 @@ export default function Home() {
                   aria-label="Select pipeline run"
                   className="run-select"
                 >
-                  <Clock3 size={15} />
-                  <SelectValue />
+                  <Layers3 size={15} />
+                  <SelectValue placeholder="Select run" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="latest">Latest run</SelectItem>
@@ -524,11 +502,11 @@ export default function Home() {
                 className="refresh-button"
                 onClick={() => void refresh()}
                 disabled={refreshing}
-                aria-label="Refresh dashboard"
+                aria-label="Refresh operations data"
               >
                 <RefreshCw size={15} className={refreshing ? "spin" : ""} />
               </Button>
-              {data?.mode === "live" ? (
+              {data?.mode === "live" && (
                 <Button
                   className="primary-button"
                   onClick={() => void runSimulation()}
@@ -537,213 +515,146 @@ export default function Home() {
                   {busy ? (
                     <LoaderCircle size={15} className="spin" />
                   ) : (
-                    <Play size={15} />
+                    <Radio size={15} />
                   )}{" "}
-                  {busy ? "Simulation running" : "Run simulation"}
-                </Button>
-              ) : (
-                <Button
-                  className="primary-button"
-                  onClick={() => setSection("architecture")}
-                >
-                  <BookOpen size={15} />
-                  Project walkthrough
-                  <ArrowUpRight size={14} />
+                  {busy ? "Processing" : "Run simulation"}
                 </Button>
               )}
             </div>
           </div>
-          {error && !data ? (
-            <div className="notice error" role="alert">
-              {error}
-              <Button variant="outline" onClick={() => void refresh()}>
-                Retry
-              </Button>
+          {(connectionNote || error || actionError) && (
+            <div className="notice" role="status">
+              {error || actionError || connectionNote}
+              {error && <button onClick={() => void refresh()}>Retry</button>}
             </div>
-          ) : !data ? (
-            <div className="metric-grid">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-32 rounded-xl" />
+          )}
+          {busy && (
+            <div className="notice" role="status">
+              <LoaderCircle size={16} className="spin" />
+              Processing events and validating the new run.
+            </div>
+          )}
+          {data?.job?.state === "failed" && (
+            <div className="notice error" role="alert">
+              The last simulation failed. Check the pipeline logs and retry.
+            </div>
+          )}
+          {data?.warnings?.map((w) => (
+            <div className="notice" role="status" key={w}>
+              {w}
+            </div>
+          ))}
+          {!data && !error ? (
+            <div className="loading-grid" aria-label="Loading operations data">
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="loading-tile" />
               ))}
             </div>
           ) : (
-            <>
-              {(connectionNote || actionError) && (
-                <div className="notice warning" role="status">
-                  {actionError || connectionNote}
-                </div>
-              )}
-              {busy && (
-                <div className="simulation-notice" role="status">
-                  <LoaderCircle size={16} className="spin" />
-                  <span>
-                    New simulation in progress. Events are being published,
-                    transformed, and tested. The dashboard refreshes
-                    automatically.
-                  </span>
-                </div>
-              )}
-              {data.job?.state === "failed" && (
-                <div className="notice error" role="alert">
-                  The last simulation failed. Check the latest pipeline run and
-                  the local API log.
-                </div>
-              )}
-              {data.warnings?.map((w) => (
-                <div className="notice warning" key={w}>
-                  {w}
-                </div>
-              ))}
-              <div className="data-notice">
-                <span>
-                  <Radio size={14} />
-                  {data.mode === "live"
-                    ? "Connected to your Docker platform"
-                    : "Recorded demo · real pipeline results, simulated flights"}
-                </span>
-                <span>
-                  Run <code>{shortId(run?.run_id || "")}</code>
-                  <i className="dot" />
-                  {run?.status === "completed" ? "Completed" : run?.status}
-                </span>
-              </div>
-              <div className="metric-grid">
-                {[
-                  {
-                    label: "Flights tracked",
-                    value: flights.length,
-                    icon: Plane,
-                    foot: `${flights.filter((f) => f.status === "departed").length} departed`,
-                    tone: "teal",
-                  },
-                  {
-                    label: "Events ingested",
-                    value: run?.raw_count || 0,
-                    icon: Activity,
-                    foot: "Kafka → MinIO",
-                    tone: "blue",
-                  },
-                  {
-                    label: "Passengers checked in",
-                    value: flights.reduce((a, f) => a + f.passengers, 0),
-                    icon: Users,
-                    foot: `Across ${flights.length} flights`,
-                    tone: "violet",
-                  },
-                  {
-                    label: "Quality checks passed",
-                    value: `${passed}/${checks.length}`,
-                    icon: ShieldCheck,
-                    foot:
-                      passed === checks.length && checks.length
-                        ? "All recorded checks passing"
-                        : "Review validation results",
-                    tone: "teal",
-                  },
-                ].map((m) => (
-                  <section className="metric-card" key={m.label}>
+            data && (
+              <>
+                <section className="metrics" aria-label="Operational summary">
+                  <div className="metric">
                     <div>
-                      <span>{m.label}</span>
-                      <span className={`metric-icon ${m.tone}`}>
-                        <m.icon size={18} />
-                      </span>
+                      <span>Scheduled flights</span>
+                      <Plane size={17} />
                     </div>
-                    <strong>{m.value}</strong>
+                    <strong>
+                      {flights.length.toString().padStart(2, "0")}
+                    </strong>
                     <p>
-                      <i className={`dot ${m.tone}`} />
-                      {m.foot}
+                      <span className="mint">{departed} departed</span>
+                      <span>{flights.length - departed} remaining</span>
                     </p>
-                  </section>
-                ))}
-              </div>
-              {(section === "overview" || section === "flights") && (
-                <>
-                  {section === "overview" && (
-                    <div className="visual-grid">
-                      <RouteMap
+                  </div>
+                  <div className="metric">
+                    <div>
+                      <span>Average delay</span>
+                      <Clock3 size={17} />
+                    </div>
+                    <strong className="amber">
+                      {Number(averageDelay.toFixed(1))}
+                      <em>min</em>
+                    </strong>
+                    <p>
+                      {flights.filter((f) => (f.delay_min || 0) > 0).length}{" "}
+                      flights with recorded delays
+                    </p>
+                  </div>
+                  <div className="metric">
+                    <div>
+                      <span>Passengers checked in</span>
+                      <Users size={17} />
+                    </div>
+                    <strong>
+                      {passengerCount.toString().padStart(2, "0")}
+                    </strong>
+                    <p>Across {flights.length} flight instances</p>
+                  </div>
+                  <div className="metric">
+                    <div>
+                      <span>Validation status</span>
+                      <ShieldCheck size={17} />
+                    </div>
+                    <strong
+                      className={
+                        passed === checks.length && checks.length ? "mint" : ""
+                      }
+                    >
+                      {passed}
+                      <em>/ {checks.length}</em>
+                    </strong>
+                    <p>
+                      {checks.length === 0
+                        ? "Awaiting validation"
+                        : passed === checks.length
+                          ? "All checks passed"
+                          : `${checks.length - passed} checks require attention`}
+                    </p>
+                  </div>
+                </section>
+                {section === "overview" && (
+                  <div className="operations-grid">
+                    <RouteMap flights={flights} onSelect={setSelectedFlight} />
+                    <section className="panel departure-panel">
+                      <div className="panel-heading">
+                        <div>
+                          <span className="eyebrow">FLIGHT MOVEMENTS</span>
+                          <h2>Departure board</h2>
+                        </div>
+                        <button
+                          className="text-button"
+                          onClick={() => setSection("flights")}
+                        >
+                          View all <ArrowUpRight size={15} />
+                        </button>
+                      </div>
+                      <FlightTable
                         flights={flights}
                         onSelect={setSelectedFlight}
+                        compact
                       />
-                      <section className="panel event-panel">
-                        <div className="panel-heading">
-                          <div>
-                            <h2>Event breakdown</h2>
-                            <p>Every signal, accounted for</p>
-                          </div>
-                          <span className="subtle-icon">
-                            <Activity size={18} />
-                          </span>
-                        </div>
-                        <div className="event-total">
-                          <strong>{run?.raw_count}</strong>
-                          <span>raw events</span>
-                          <span className="tiny-badge">
-                            {run?.valid_count} unique
-                          </span>
-                        </div>
-                        <div className="event-bars">
-                          {eventTypes.map(([type, label], i) => {
-                            const n = events.filter(
-                              (e) => e.event_type === type,
-                            ).length;
-                            return (
-                              <div className="event-bar" key={type}>
-                                <div>
-                                  <span>
-                                    <i
-                                      style={{
-                                        background: [
-                                          "#198777",
-                                          "#77b7b0",
-                                          "#6286ab",
-                                          "#b4c7d8",
-                                          "#a9b7c8",
-                                        ][i],
-                                      }}
-                                    />
-                                    {label}
-                                  </span>
-                                  <strong>{n}</strong>
-                                </div>
-                                <div className="bar-track">
-                                  <div
-                                    style={{
-                                      width: `${(n / Math.max(1, ...eventTypes.map(([t]) => events.filter((e) => e.event_type === t).length))) * 100}%`,
-                                      background: [
-                                        "#198777",
-                                        "#77b7b0",
-                                        "#6286ab",
-                                        "#b4c7d8",
-                                        "#a9b7c8",
-                                      ][i],
-                                    }}
-                                  />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="event-foot">
-                          <CheckCheck size={15} />
-                          {run?.duplicate_count} duplicates safely removed
-                        </div>
-                      </section>
-                    </div>
-                  )}
+                      <div className="board-note">
+                        <Clock3 size={13} />
+                        Times UTC · delays in min
+                        <span>{flights.length} flights</span>
+                      </div>
+                    </section>
+                  </div>
+                )}
+                {section === "flights" && (
                   <section className="panel board-panel">
                     <div className="panel-heading">
                       <div className="heading-inline">
-                        <h2>Flight board</h2>
-                        <span className="count-chip">
-                          {flights.length} flights
-                        </span>
+                        <h2>All flights</h2>
+                        <span className="count-chip">{flights.length}</span>
                       </div>
                       <label className="search-field">
-                        <Search size={15} />
+                        <Search size={16} />
                         <input
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
-                          placeholder="Search flights or airports"
+                          placeholder="Flight, airport or city"
                           aria-label="Search flights or airports"
                         />
                       </label>
@@ -752,58 +663,144 @@ export default function Home() {
                       flights={filtered}
                       onSelect={setSelectedFlight}
                     />
-                    {filtered.length === 0 && (
+                    {!filtered.length && (
                       <p className="empty-state">
                         No flights match your search.
                       </p>
                     )}
                     <div className="table-footer">
                       <span>
-                        Showing {filtered.length} flight{" "}
-                        {filtered.length === 1 ? "instance" : "instances"} for
-                        this run
+                        {filtered.length} of {flights.length} flights
                       </span>
-                      <span>
-                        All times UTC <Clock3 size={13} />
-                      </span>
+                      <span>Times UTC · delays in min</span>
                     </div>
                   </section>
-                </>
-              )}
-              {section === "overview" && (
-                <section className="pipeline-strip">
-                  <div>
-                    <Workflow size={18} />
-                    <strong>A complete journey for every event</strong>
+                )}
+                {section === "overview" && (
+                  <div className="bottom-grid">
+                    <section className="panel ingestion-panel">
+                      <div className="panel-heading">
+                        <div>
+                          <span className="eyebrow">EVENT INGESTION</span>
+                          <h2>Event distribution</h2>
+                        </div>
+                        <span className="data-total">
+                          <strong>{run?.raw_count ?? 0}</strong> records
+                        </span>
+                      </div>
+                      <div className="event-segments">
+                        {eventTypes.map(([type, label], i) => {
+                          const count = events.filter(
+                            (e) => e.event_type === type,
+                          ).length;
+                          return (
+                            <div
+                              key={type}
+                              style={{
+                                flex: count,
+                                background: [
+                                  "#eead66",
+                                  "#7799bb",
+                                  "#557186",
+                                  "#455967",
+                                  "#35454f",
+                                ][i],
+                              }}
+                              title={`${label}: ${count}`}
+                            />
+                          );
+                        })}
+                      </div>
+                      <div className="event-legend">
+                        {eventTypes.map(([type, label], i) => (
+                          <div key={type}>
+                            <i
+                              style={{
+                                background: [
+                                  "#eead66",
+                                  "#7799bb",
+                                  "#557186",
+                                  "#455967",
+                                  "#35454f",
+                                ][i],
+                              }}
+                            />
+                            <span>{label}</span>
+                            <strong>
+                              {
+                                events.filter((e) => e.event_type === type)
+                                  .length
+                              }
+                            </strong>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                    <section className="panel reconciliation-panel">
+                      <div className="panel-heading">
+                        <div>
+                          <span className="eyebrow">PIPELINE ACCOUNTING</span>
+                          <h2>Batch reconciliation</h2>
+                        </div>
+                        <button
+                          className="icon-button"
+                          aria-label="Open pipeline activity"
+                          onClick={() => setSection("runs")}
+                        >
+                          <ArrowUpRight size={17} />
+                        </button>
+                      </div>
+                      <div className="reconciliation">
+                        <div>
+                          <ArrowDownToLine size={16} />
+                          <strong>{run?.raw_count ?? 0}</strong>
+                          <span>Ingested</span>
+                        </div>
+                        <ChevronRight size={15} />
+                        <div>
+                          <Database size={16} />
+                          <strong>{run?.valid_count ?? 0}</strong>
+                          <span>Accepted</span>
+                        </div>
+                        <div className="removed">
+                          <strong>{run?.duplicate_count ?? 0}</strong>
+                          <span>Duplicates</span>
+                        </div>
+                        <div className="removed">
+                          <strong>{run?.rejected_count ?? 0}</strong>
+                          <span>Rejected</span>
+                        </div>
+                      </div>
+                    </section>
                   </div>
-                  <div className="pipeline-stages">
-                    {["Kafka", "MinIO", "PySpark", "PostgreSQL"].map((s, i) => (
-                      <span key={s}>
-                        {i > 0 && <ArrowRight size={14} />}
-                        <span>{s}</span>
-                      </span>
-                    ))}
-                  </div>
-                  <button onClick={() => setSection("architecture")}>
-                    See how it works
-                    <ArrowUpRight size={15} />
-                  </button>
-                </section>
-              )}
-              {section === "runs" && (
-                <RunsView data={data} run={run} onSelect={setSelectedRun} />
-              )}
-              {section === "quality" && (
-                <QualityView checks={checks} run={run} />
-              )}
-              {section === "architecture" && (
-                <ArchitectureView onExplore={() => setSection("flights")} />
-              )}
-              <footer className="page-footer">
-                <span>AeroStream · Airline Ops Data Platform</span>
-                <span>Python · Kafka · MinIO · PySpark · PostgreSQL</span>
-              </footer>
-            </>
+                )}
+                {section === "runs" && (
+                  <RunsView data={data} run={run} onSelect={setSelectedRun} />
+                )}
+                {section === "quality" && (
+                  <QualityView checks={checks} run={run} />
+                )}
+                <footer className="page-footer">
+                  <span>
+                    <span
+                      className={`run-indicator ${run?.status === "completed" ? "complete" : ""}`}
+                    />
+                    {run?.status === "completed"
+                      ? "Batch completed"
+                      : run?.status || "No completed batch"}
+                    <code>{run ? shortId(run.run_id) : "—"}</code>
+                  </span>
+                  <span>
+                    {data.mode === "snapshot"
+                      ? "Recorded synthetic data"
+                      : "Synthetic event stream"}
+                    <span className="footer-divider">/</span>Processed{" "}
+                    {date(run?.transformed_at)} · {time(run?.transformed_at)}{" "}
+                    UTC
+                  </span>
+                </footer>
+              </>
+            )
           )}
         </main>
       </div>
@@ -816,7 +813,8 @@ export default function Home() {
         <SheetContent className="flight-sheet">
           <SheetHeader>
             <SheetTitle>
-              {selectedFlight?.flight_number} · Flight details
+              {selectedFlight?.flight_number}
+              <span className="sheet-title-label">Flight details</span>
             </SheetTitle>
             <SheetDescription>
               {selectedFlight?.origin} → {selectedFlight?.dest} ·{" "}

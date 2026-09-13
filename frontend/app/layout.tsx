@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "AeroStream | Airline Operations",
   description:
-    "Explore Varun’s airline operations data platform: live flight data, replay-safe pipelines, and verified data quality.",
+    "Airline operations control: flight movements, network routes, passenger check-ins, and event processing.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

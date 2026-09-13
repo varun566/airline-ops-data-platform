@@ -2,20 +2,13 @@
 
 import { useState } from "react";
 import {
-  ArrowRight,
-  ArrowUpRight,
   Braces,
   Check,
-  CheckCheck,
   ChevronRight,
   Clock3,
-  Code2,
   Database,
   FileJson,
-  GitBranch,
-  Layers3,
   Plane,
-  Radio,
   ShieldCheck,
   Users,
   Workflow,
@@ -30,11 +23,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
+
 import {
   AIRPORTS,
-  SOURCE,
   date,
   shortId,
   time,
@@ -114,11 +105,8 @@ export function RunsView({
       <section className="panel">
         <div className="panel-heading section-heading">
           <div>
-            <h2>Pipeline history</h2>
-            <p>
-              Each simulation has its own manifest, raw offsets, and flight
-              instances.
-            </p>
+            <h2>Run history</h2>
+            <p>Ingestion and transformation results by batch.</p>
           </div>
           <span className="count-chip">{data.runs.length} runs</span>
         </div>
@@ -191,9 +179,9 @@ export function RunsView({
         <section className="panel accounting-panel">
           <div>
             <span className="eyebrow">RUN {shortId(run.run_id)}</span>
-            <h2>Nothing gets lost between stages.</h2>
+            <h2>Event reconciliation</h2>
             <p>
-              Every landed event is accounted for before the database merge.
+              Accepted, duplicate, and rejected records for the selected batch.
             </p>
           </div>
           <div className="accounting-equation">
@@ -216,17 +204,6 @@ export function RunsView({
           {run.error && <p className="inline-error">{run.error}</p>}
         </section>
       )}
-      <section className="context-note">
-        <GitBranch size={20} />
-        <div>
-          <h3>Same flight number. Different simulation.</h3>
-          <p>
-            AO100 can appear in several runs. Each flight’s ID includes its
-            service date and run UUID, so repeating the demo creates a new
-            flight instance. Replaying an existing run keeps its rows unchanged.
-          </p>
-        </div>
-      </section>
     </div>
   );
 }
@@ -254,12 +231,11 @@ export function QualityView({
             {checks.length === 0
               ? "Awaiting validation"
               : pass === checks.length
-                ? "Data you can trace. Checks you can verify."
-                : "Some checks need attention."}
+                ? "All validations passed"
+                : "Validation exceptions"}
           </h2>
           <p>
-            {pass} of {checks.length} recorded checks passed. Outcomes come
-            directly from PyTest and PostgreSQL.
+            {pass} of {checks.length} checks passed.
           </p>
         </div>
         <div className="quality-percent">
@@ -272,7 +248,7 @@ export function QualityView({
       <section className="panel">
         <div className="panel-heading section-heading">
           <div>
-            <h2>Integrity checks</h2>
+            <h2>Validation checks</h2>
             <p>
               Validation{" "}
               {checks[0] ? shortId(checks[0].validation_id) : "pending"} · Run{" "}
@@ -335,295 +311,6 @@ export function QualityView({
           )}
         </div>
       </section>
-    </div>
-  );
-}
-
-const stages = [
-  {
-    name: "Simulate",
-    tech: "Python + Kafka",
-    icon: Radio,
-    number: "01",
-    title: "Operational signals become an event stream.",
-    description:
-      "The producer generates flight schedules, gate changes, delays, departures, and passenger check-ins. A manifest records only acknowledged Kafka offsets. Flight ID keys keep each flight’s records on one partition.",
-    proof: "32 acknowledged records per default run",
-    file: "airline_ops/producer.py",
-  },
-  {
-    name: "Land",
-    tech: "Python + MinIO",
-    icon: FileJson,
-    number: "02",
-    title: "Persist first. Acknowledge second.",
-    description:
-      "The consumer archives the original JSON before committing its Kafka offset. Date, topic, partition, and offset form a deterministic object key. Redelivery writes to the same key, including across midnight.",
-    proof: "Raw payload bytes and Kafka offsets verified",
-    file: "airline_ops/consumer.py",
-  },
-  {
-    name: "Transform",
-    tech: "PySpark",
-    icon: Workflow,
-    number: "03",
-    title: "Turn noisy events into a coherent data model.",
-    description:
-      "Spark casts types, validates routes and timestamps, quarantines invalid records, and removes duplicate IDs and composite keys. Event time determines the final flight state, even when arrival order is shuffled.",
-    proof: "28 unique events · 4 duplicates removed",
-    file: "airline_ops/normalize.py",
-  },
-  {
-    name: "Model",
-    tech: "PostgreSQL + JDBC",
-    icon: Database,
-    number: "04",
-    title: "Enforce integrity where the records live.",
-    description:
-      "Spark writes to isolated staging tables via JDBC. PostgreSQL merges parents and children in one transaction with primary keys, foreign keys, and check constraints intact. Reprocessing a run keeps its rows stable.",
-    proof: "Atomic rollback and replay verified by tests",
-    file: "airline_ops/transform.py",
-  },
-  {
-    name: "Validate",
-    tech: "PyTest",
-    icon: ShieldCheck,
-    number: "05",
-    title: "Make reliability visible and repeatable.",
-    description:
-      "Tests read real Kafka offsets, compare raw payloads, verify database counts and constraints, and replay the transformation. Each test outcome is saved to data_quality_report. GitHub Actions runs the entire stack.",
-    proof: "Unit coverage + 11 pipeline integration tests",
-    file: "tests/integration/test_pipeline.py",
-  },
-];
-
-export function ArchitectureView({ onExplore }: { onExplore: () => void }) {
-  const [active, setActive] = useState(0);
-  const stage = stages[active];
-  return (
-    <div className="view-stack">
-      <section className="architecture-intro">
-        <div>
-          <span className="eyebrow">THE ENGINEERING BEHIND THE BOARD</span>
-          <h2>
-            From operational noise
-            <br />
-            to dependable records.
-          </h2>
-          <p>
-            A containerized data platform with a streaming ingestion layer, a
-            raw data lake, and a tested relational model.
-          </p>
-        </div>
-        <a
-          className="architecture-source"
-          href={SOURCE}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <GitBranch size={20} />
-          <span>
-            Explore the implementation<small>Open source on GitHub</small>
-          </span>
-          <ArrowUpRight size={20} />
-        </a>
-      </section>
-      <section className="panel architecture-panel">
-        <div className="stage-tabs" role="tablist" aria-label="Pipeline stages">
-          {stages.map((s, i) => (
-            <button
-              role="tab"
-              aria-selected={i === active}
-              aria-controls="stage-details"
-              tabIndex={i === active ? 0 : -1}
-              onKeyDown={(event) => {
-                const next =
-                  event.key === "ArrowRight"
-                    ? (i + 1) % stages.length
-                    : event.key === "ArrowLeft"
-                      ? (i + stages.length - 1) % stages.length
-                      : event.key === "Home"
-                        ? 0
-                        : event.key === "End"
-                          ? stages.length - 1
-                          : null;
-                if (next !== null) {
-                  event.preventDefault();
-                  setActive(next);
-                  document.getElementById(`stage-${next}`)?.focus();
-                }
-              }}
-              id={`stage-${i}`}
-              key={s.name}
-              onClick={() => setActive(i)}
-              className={i === active ? "active" : ""}
-            >
-              <span className="stage-number">{s.number}</span>
-              <s.icon size={24} />
-              <strong>{s.name}</strong>
-              <small>{s.tech}</small>
-              {i < 4 && <ArrowRight className="stage-arrow" size={15} />}
-            </button>
-          ))}
-        </div>
-        <div
-          className="stage-details"
-          role="tabpanel"
-          id="stage-details"
-          aria-labelledby={`stage-${active}`}
-        >
-          <div>
-            <span className="eyebrow">{stage.tech}</span>
-            <h3>{stage.title}</h3>
-            <p>{stage.description}</p>
-            <a
-              href={`${SOURCE}/blob/main/${stage.file}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Code2 size={15} />
-              Read the source <ArrowUpRight size={14} />
-            </a>
-          </div>
-          <div className="stage-proof">
-            <CheckCheck size={25} />
-            <strong>Evidence, built in.</strong>
-            <p>{stage.proof}</p>
-          </div>
-        </div>
-      </section>
-      <Tabs defaultValue="present" className="architecture-bottom">
-        <TabsList className="story-tabs">
-          <TabsTrigger value="present">Present the project</TabsTrigger>
-          <TabsTrigger value="schema">Data model</TabsTrigger>
-          <TabsTrigger value="tradeoffs">Design decisions</TabsTrigger>
-        </TabsList>
-        <TabsContent value="present">
-          <section className="presentation-panel panel">
-            <div>
-              <span className="eyebrow">YOUR 60-SECOND INTRODUCTION</span>
-              <h3>“I built a replay-safe airline data platform.”</h3>
-              <p>
-                “It simulates operational events in Kafka, preserves raw JSON in
-                MinIO, and uses PySpark to normalize the data into PostgreSQL. I
-                focused on what happens when messages arrive twice, arrive out
-                of order, or fail during a load. Automated tests verify the
-                delivery counts, constraints, and replay behavior—and this
-                dashboard makes the results easy to inspect.”
-              </p>
-              <Button className="primary-button" onClick={onExplore}>
-                Show the flight board
-                <ArrowRight size={15} />
-              </Button>
-            </div>
-            <ol>
-              <li>
-                <span>01</span>
-                <div>
-                  <strong>Start with the outcome</strong>
-                  <p>
-                    Show one flight, its gate, and its final departure state.
-                  </p>
-                </div>
-              </li>
-              <li>
-                <span>02</span>
-                <div>
-                  <strong>Follow the evidence</strong>
-                  <p>
-                    Open its event history and explain raw → normalized data.
-                  </p>
-                </div>
-              </li>
-              <li>
-                <span>03</span>
-                <div>
-                  <strong>Show the reliability work</strong>
-                  <p>
-                    Explain duplicate handling, rollback, and the quality
-                    report.
-                  </p>
-                </div>
-              </li>
-            </ol>
-          </section>
-        </TabsContent>
-        <TabsContent value="schema">
-          <section className="schema-grid">
-            {[
-              {
-                name: "flights",
-                key: "flight_id",
-                fields: [
-                  "origin · dest",
-                  "scheduled_dep · actual_dep",
-                  "status · gate",
-                  "source_run_id → pipeline_runs",
-                ],
-              },
-              {
-                name: "delays",
-                key: "delay_id",
-                fields: [
-                  "flight_id → flights",
-                  "delay_min: 0–1440",
-                  "reason · occurred_at",
-                  "UNIQUE (flight_id, occurred_at)",
-                ],
-              },
-              {
-                name: "passengers",
-                key: "pax_id",
-                fields: [
-                  "flight_id → flights",
-                  "checkin_time",
-                  "Flight-specific booking ID",
-                  "Earliest valid check-in wins",
-                ],
-              },
-            ].map((t) => (
-              <article className="panel schema-card" key={t.name}>
-                <Database size={19} />
-                <h3>{t.name}</h3>
-                <div className="pk">
-                  <span>PK</span>
-                  <code>{t.key}</code>
-                </div>
-                {t.fields.map((f) => (
-                  <p key={f}>{f}</p>
-                ))}
-              </article>
-            ))}
-          </section>
-        </TabsContent>
-        <TabsContent value="tradeoffs">
-          <section className="decision-grid">
-            {[
-              [
-                "At-least-once delivery",
-                "Kafka and MinIO do not share a transaction. Commit after persistence and deterministic object keys make retries safe.",
-              ],
-              [
-                "Batch transformations",
-                "Kafka ingestion is continuous. Spark processes completed manifests in bounded batches for reproducible counts.",
-              ],
-              [
-                "Small, inspectable runs",
-                "The demo uses 32 records per run to expose every state transition. It does not claim production-scale performance.",
-              ],
-              [
-                "Local system, public evidence",
-                "Docker runs the live stack. This public demo shows a recorded snapshot of synthetic events without exposing the database.",
-              ],
-            ].map(([title, body]) => (
-              <article className="panel decision-card" key={title}>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </article>
-            ))}
-          </section>
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
@@ -741,7 +428,7 @@ export function FlightDetails({
         </div>
       )}
       <div className="lineage-card">
-        <span className="eyebrow">TRACEABLE BY DESIGN</span>
+        <span className="eyebrow">RECORD LINEAGE</span>
         <p>Flight instance</p>
         <code>{flight.flight_id}</code>
         <p>Pipeline run</p>

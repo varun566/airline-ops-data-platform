@@ -72,23 +72,22 @@ The hosted demo uses recorded synthetic pipeline results.
 
 Open **[AeroStream locally](http://localhost:8088)** after Compose starts.
 
-- **Overview:** route map, event counts, and a searchable flight board.
-- **Flight operations:** open a flight to inspect its state, event timeline, original JSON, and raw object key.
-- **Pipeline runs:** compare simulations and reconcile raw, unique, duplicate, and rejected counts.
-- **Data quality:** expand actual PyTest results persisted in PostgreSQL.
-- **Architecture:** explore each pipeline stage, the relational model, and a recruiter presentation script.
+- **Network:** US route map beside a departure board, with average delay and check-in totals.
+- **Flights:** search by flight, airport, or city; inspect gates, event history, and raw JSON.
+- **Pipeline:** compare batch counts and reconcile accepted, duplicate, and rejected records.
+- **Quality:** inspect the latest persisted validation results for the selected run.
+
 
 **Run simulation** starts a real bounded pipeline run and its integration tests.
 The dashboard polls every 12 seconds; selecting **Latest run** follows the new result.
 Only one dashboard-triggered simulation runs at a time.
 
 The public portfolio build serves a **recorded snapshot of synthetic data**.
-It is labeled as a snapshot and has a project walkthrough in place of the local
-simulation action. It does not connect to your laptop or expose PostgreSQL,
+It is labeled as simulated data and has no remote simulation action. It does not connect to your laptop or expose PostgreSQL,
 Kafka, MinIO, or local credentials. If the local API is unavailable, the dashboard
 clearly labels its fallback snapshot.
 
-[Recruiter walkthrough and resume bullets](docs/recruiter-demo.md) ·
+[Separate presentation manuscript](docs/presentation-manuscript.md) ·
 [Frontend development and snapshot export](frontend/README.md)
 
 ## Inspect the results
