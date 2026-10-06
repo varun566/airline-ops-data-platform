@@ -1,9 +1,0 @@
-node_modules
-.git
-.env*
-.sites-runtime
-.wrangler
-dist
-out
-.next
-*.tsbuildinfo
