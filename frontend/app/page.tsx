@@ -367,7 +367,9 @@ export default function Home() {
           );
         }
       }
-      const response = await fetch("/demo-data.json");
+      // Keep this relative so the public dashboard also works from a GitHub
+      // Pages project URL such as /airline-ops-data-platform/.
+      const response = await fetch("demo-data.json");
       if (!response.ok) throw new Error("Unable to load operations data.");
       setData(await response.json());
       setError("");
