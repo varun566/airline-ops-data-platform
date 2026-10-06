@@ -51,6 +51,12 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    // GitHub Pages serves this public demo beneath the repository name rather
+    // than at the domain root. Local Docker and Sites builds keep root paths.
+    base:
+      process.env.GITHUB_PAGES === "true"
+        ? "/airline-ops-data-platform/"
+        : "/",
     server: {
       proxy: { "/api": { target: "http://127.0.0.1:8010", changeOrigin: false } },
       ...(managedLinux ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] } : {}),
